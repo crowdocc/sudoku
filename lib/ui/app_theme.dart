@@ -38,11 +38,9 @@ List<BoxShadow> topDownShadow(Color color, double blur) => [
 /// Oyun ekranının renkleri. Hücre, seçim ve vurgular nötr tonlardadır.
 class GameColors {
   final Color background;
-  final Color card;
-  final Color cardShadow;
-  final Color gap;
+  final Color gridShadow;
   final Color cell;
-  final Color cellShadow;
+  final Color cellLine;
   final Color peer;
   final Color selected;
   final Color selectedBorder;
@@ -53,7 +51,6 @@ class GameColors {
   final Color error;
   final Color cageLine;
   final Color cageText;
-  final Color panel;
   final Color key;
   final Color keyShadow;
   final Color keyText;
@@ -62,15 +59,14 @@ class GameColors {
   final Color keyActiveText;
   final Color icon;
   final Color muted;
+  final Color tool;
   final double paintAlpha;
 
   const GameColors({
     required this.background,
-    required this.card,
-    required this.cardShadow,
-    required this.gap,
+    required this.gridShadow,
     required this.cell,
-    required this.cellShadow,
+    required this.cellLine,
     required this.peer,
     required this.selected,
     required this.selectedBorder,
@@ -81,7 +77,6 @@ class GameColors {
     required this.error,
     required this.cageLine,
     required this.cageText,
-    required this.panel,
     required this.key,
     required this.keyShadow,
     required this.keyText,
@@ -90,28 +85,26 @@ class GameColors {
     required this.keyActiveText,
     required this.icon,
     required this.muted,
+    required this.tool,
     required this.paintAlpha,
   });
 
   static const light = GameColors(
-    background: Color(0xFFEBEBEA),
-    card: Color(0xFFF6F6F6),
-    cardShadow: Color(0x2E000000),
-    gap: Color(0xFFDCDCDC),
+    background: Color(0xFFEDEDEC),
+    gridShadow: Color(0x24000000),
     cell: Color(0xFFFFFFFF),
-    cellShadow: Color(0x14000000),
-    peer: Color(0xFFEBEBEB),
-    selected: Color(0xFFD0D0D0),
+    cellLine: Color(0xFFE6E6E6),
+    peer: Color(0xFFEDEDED),
+    selected: Color(0xFFD3D3D3),
     selectedBorder: Color(0xFF6A6A6A),
-    boxLine: brandOkra,
+    boxLine: Color(0x99B8963E),
     givenText: Color(0xFF1E1E1E),
     userText: Color(0xFF5C5C5C),
     noteText: Color(0xFF6E6E6E),
     error: Color(0xFFD32F2F),
-    cageLine: Color(0xFF8E8E8E),
-    cageText: Color(0xFF454545),
-    panel: Color(0xFFE2E2E1),
-    key: Color(0xFFF8F8F8),
+    cageLine: Color(0xFF505050),
+    cageText: Color(0xFF3A3A3A),
+    key: Color(0xFFF9F9F9),
     keyShadow: Color(0x33000000),
     keyText: Color(0xFF2A2A2A),
     engrave: Color(0xE6FFFFFF),
@@ -119,28 +112,26 @@ class GameColors {
     keyActiveText: Color(0xFFFFFFFF),
     icon: Color(0xFF3A3A3A),
     muted: Color(0xFF8A8A8A),
+    tool: Color(0xFF8C8C8C),
     paintAlpha: 0.55,
   );
 
   static const dark = GameColors(
-    background: Color(0xFF0E0E0E),
-    card: Color(0xFF1A1A1A),
-    cardShadow: Color(0xB3000000),
-    gap: Color(0xFF121212),
-    cell: Color(0xFF1F1F1F),
-    cellShadow: Color(0x80000000),
-    peer: Color(0xFF2B2B2B),
-    selected: Color(0xFF3E3E3E),
+    background: Color(0xFF101010),
+    gridShadow: Color(0x99000000),
+    cell: Color(0xFF1B1B1B),
+    cellLine: Color(0xFF262626),
+    peer: Color(0xFF2A2A2A),
+    selected: Color(0xFF3D3D3D),
     selectedBorder: Color(0xFFBDBDBD),
-    boxLine: brandOkra,
+    boxLine: Color(0x8CB8963E),
     givenText: Color(0xFFA8A8A8),
     userText: Color(0xFFF5F5F5),
     noteText: Color(0xFF9A9A9A),
     error: Color(0xFFFF6B6B),
-    cageLine: Color(0xFF7A7A7A),
-    cageText: Color(0xFFB5B5B5),
-    panel: Color(0xFF161616),
-    key: Color(0xFF282828),
+    cageLine: Color(0xFFE4E4E4),
+    cageText: Color(0xFFE0E0E0),
+    key: Color(0xFF262626),
     keyShadow: Color(0xB3000000),
     keyText: Color(0xFFD8D8D8),
     engrave: Color(0xB3000000),
@@ -148,6 +139,7 @@ class GameColors {
     keyActiveText: Color(0xFF121212),
     icon: Color(0xFFD0D0D0),
     muted: Color(0xFF8A8A8A),
+    tool: Color(0xFF8A8A8A),
     paintAlpha: 0.5,
   );
 

@@ -147,4 +147,79 @@ void main() {
     expect(g.status, GameStatus.won);
     g.dispose();
   });
+
+  test('Silgi sayıyı, notları ve renkleri siler; verilen sayıyı silmez', () {
+    final g = GameState(classicPuzzles[0]);
+    final e = firstEmpty(g);
+    final givenCell = g.given.indexWhere((x) => x);
+    g.tapCell(e);
+    g.toggleNotesMode();
+    g.pressNumber(3);
+    g.toggleNotesMode();
+    g.toggleColor(1);
+    g.pressNumber(g.solution[e]);
+    g.erase();
+    expect(g.values[e], 0);
+    expect(g.notes[e], 0);
+    expect(g.colors[e], 0);
+    g.tapCell(givenCell);
+    g.toggleColor(0);
+    g.erase();
+    expect(g.values[givenCell], g.solution[givenCell]);
+    expect(g.colors[givenCell], 0);
+    g.dispose();
+  });
+
+  test('Önce sayı: hücre seçmez, yerleştirir, tekrar dokununca siler', () {
+    final g = GameState(classicPuzzles[0]);
+    g.toggleInputMode();
+    final e = firstEmpty(g);
+    final d = g.solution[e];
+    g.pressNumber(d);
+    g.tapCell(e);
+    expect(g.selection, isEmpty);
+    expect(g.values[e], d);
+    g.tapCell(e);
+    expect(g.values[e], 0);
+    expect(g.mistakes, 0);
+    g.dispose();
+  });
+
+  test('Önce sayı (killer adaylar): dokunma not açar/kapar, kaydırma not ekler', () {
+    final g = GameState(killerPuzzles[0]);
+    g.toggleInputMode();
+    g.pressNumber(4, asCandidate: true);
+    g.tapCell(0);
+    expect(g.hasNote(0, 4), isTrue);
+    g.tapCell(0);
+    expect(g.hasNote(0, 4), isFalse);
+    g.dragStart(10);
+    g.dragTo(11);
+    g.dragTo(12);
+    expect([10, 11, 12].every((i) => g.hasNote(i, 4)), isTrue);
+    expect(g.selection, isEmpty);
+    g.pressNumber(4);
+    g.dragStart(20);
+    g.dragTo(21);
+    expect(g.values[20], 0);
+    expect(g.values[21], 0);
+    g.dispose();
+  });
+
+  test('Kafes kombinasyonları ve eleme', () {
+    final g = GameState(killerPuzzles[0]);
+    final k = g.cages.indexWhere((c) => c.cells.length == 2 && c.sum == 13) ;
+    if (k >= 0) {
+      expect(g.combosForCage(k), ['49', '58', '67']);
+    }
+    g.tapCell(g.cages[0].cells.first);
+    final cage = g.selectedCage!;
+    final combos = g.combosForCage(cage);
+    expect(combos, isNotEmpty);
+    g.toggleCombo(cage, combos.first);
+    expect(g.isComboEliminated(cage, combos.first), isTrue);
+    g.toggleCombo(cage, combos.first);
+    expect(g.isComboEliminated(cage, combos.first), isFalse);
+    g.dispose();
+  });
 }

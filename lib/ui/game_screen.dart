@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -24,6 +25,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   static InputMode _lastInputMode = InputMode.cellFirst;
 
   late final GameState game;
+  final PageController _panelController = PageController();
   bool _ended = false;
 
   @override
@@ -71,7 +73,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     game.removeListener(_onGameChanged);
     game.dispose();
+    _panelController.dispose();
     super.dispose();
+  }
+
+  void _togglePanelPage() {
+    _panelController.animateToPage(game.colorPage ? 0 : 1,
+        duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
   }
 
   @override
@@ -82,7 +90,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
+            constraints: const BoxConstraints(maxWidth: 560),
             child: ListenableBuilder(
               listenable: game,
               builder: (context, _) => Column(
@@ -95,16 +103,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                       child: Column(
                         children: [
                           _TopBar(game: game, colors: colors),
-                          _InfoRow(game: game, colors: colors),
+                          _ContextRow(game: game, colors: colors),
                           Expanded(
                             child: Align(
                               alignment: Alignment.topCenter,
                               child: Padding(
                                 padding:
-                                    const EdgeInsets.fromLTRB(10, 4, 10, 8),
+                                    const EdgeInsets.symmetric(horizontal: 4),
                                 child: AspectRatio(
                                   aspectRatio: 1,
-                                  child: _GridCard(game: game, colors: colors),
+                                  child: _GridArea(game: game, colors: colors),
                                 ),
                               ),
                             ),
@@ -113,10 +121,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                       ),
                     ),
                   ),
-                  _ToolsRow(game: game, colors: colors),
-                  const SizedBox(height: 4),
-                  BottomPanel(game: game),
-                  const SizedBox(height: 12),
+                  _ToolsRow(
+                    game: game,
+                    colors: colors,
+                    onTogglePage: _togglePanelPage,
+                  ),
+                  BottomPanel(game: game, controller: _panelController),
+                  const SizedBox(height: 10),
                 ],
               ),
             ),
@@ -135,39 +146,60 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+    final iconColor = colors.icon;
+    return SizedBox(
+      height: 44,
       child: Row(
         children: [
           IconButton(
             tooltip: 'Geri',
-            icon: Icon(Icons.arrow_back, color: colors.icon),
+            iconSize: 22,
+            icon: Icon(Icons.arrow_back, color: iconColor),
             onPressed: () => Navigator.of(context).maybePop(),
           ),
           const SizedBox(width: 48),
           Expanded(
-            child: Center(
-              child: Text(
-                game.timeText,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: colors.icon,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  game.timeText,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: iconColor,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                for (var k = 0; k < GameState.maxMistakes; k++)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 2),
+                    child: Icon(
+                      k >= GameState.maxMistakes - game.mistakes
+                          ? Icons.favorite_border
+                          : Icons.favorite,
+                      size: 13,
+                      color: k >= GameState.maxMistakes - game.mistakes
+                          ? colors.muted.withValues(alpha: 0.45)
+                          : colors.error,
+                    ),
+                  ),
+              ],
             ),
           ),
           IconButton(
             tooltip: game.paused ? 'Devam et' : 'Duraklat',
+            iconSize: 22,
             icon: Icon(game.paused ? Icons.play_arrow : Icons.pause,
-                color: colors.icon),
+                color: iconColor),
             onPressed:
                 game.status == GameStatus.playing ? game.togglePause : null,
           ),
           IconButton(
             tooltip: 'Ayarlar',
-            icon: Icon(Icons.settings_outlined, color: colors.icon),
+            iconSize: 22,
+            icon: Icon(Icons.settings_outlined, color: iconColor),
             onPressed: () {
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
@@ -183,49 +215,40 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-class _InfoRow extends StatelessWidget {
+/// Sabit yükseklikli ince bağlam satırı: killer kombinasyon çipleri ve toplam.
+class _ContextRow extends StatelessWidget {
   final GameState game;
   final GameColors colors;
 
-  const _InfoRow({required this.game, required this.colors});
+  const _ContextRow({required this.game, required this.colors});
 
   @override
   Widget build(BuildContext context) {
-    final modeName = game.isKiller ? 'Killer' : 'Klasik';
+    final cage = game.selectedCage;
     final sum = game.selectionSum;
-    const style = TextStyle(
-      fontSize: 14,
-      fontWeight: FontWeight.w600,
-      color: brandOkra,
-    );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-      child: SizedBox(
-        height: 24,
+    return SizedBox(
+      height: 30,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Row(
           children: [
             Expanded(
-              child: Text('$modeName · #${game.puzzle.number}', style: style),
+              child: cage == null
+                  ? const SizedBox.shrink()
+                  : _ComboChips(game: game, colors: colors, cage: cage),
             ),
-            if (sum != null) Text('Toplam: $sum', style: style),
-            Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: List.generate(GameState.maxMistakes, (k) {
-                  final lost = k >= GameState.maxMistakes - game.mistakes;
-                  return Padding(
-                    padding: const EdgeInsets.only(left: 3),
-                    child: Icon(
-                      lost ? Icons.favorite_border : Icons.favorite,
-                      size: 18,
-                      color: lost
-                          ? colors.muted.withValues(alpha: 0.45)
-                          : brandOkra,
-                    ),
-                  );
-                }),
+            if (sum != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Text(
+                  'Toplam: $sum',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: colors.icon,
+                  ),
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -233,22 +256,83 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-/// Yuvarlak köşeli, hafifçe yükselmiş ızgara kartı.
-class _GridCard extends StatelessWidget {
+class _ComboChips extends StatelessWidget {
+  final GameState game;
+  final GameColors colors;
+  final int cage;
+
+  const _ComboChips(
+      {required this.game, required this.colors, required this.cage});
+
+  @override
+  Widget build(BuildContext context) {
+    final combos = game.combosForCage(cage);
+    return ListView(
+      scrollDirection: Axis.horizontal,
+      children: [
+        Center(
+          child: Text(
+            '${game.cages[cage].sum} =',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: colors.icon,
+            ),
+          ),
+        ),
+        for (final combo in combos)
+          Padding(
+            padding: const EdgeInsets.only(left: 6),
+            child: Center(child: _chip(combo)),
+          ),
+      ],
+    );
+  }
+
+  Widget _chip(String combo) {
+    final off = game.isComboEliminated(cage, combo);
+    return GestureDetector(
+      onTap: () => game.toggleCombo(cage, combo),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: off ? Colors.transparent : colors.key,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: colors.muted.withValues(alpha: off ? 0.25 : 0.4),
+            width: 0.8,
+          ),
+        ),
+        child: Text(
+          combo,
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.1,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.5,
+            color: off ? colors.muted.withValues(alpha: 0.5) : colors.icon,
+            decoration: off ? TextDecoration.lineThrough : null,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Izgara: ayrı kart yok; bütününde çok hafif, her yöne eşit gölge.
+class _GridArea extends StatelessWidget {
   final GameState game;
   final GameColors colors;
 
-  const _GridCard({required this.game, required this.colors});
+  const _GridArea({required this.game, required this.colors});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: colors.card,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: topDownShadow(colors.cardShadow, 16),
+        color: colors.cell,
+        boxShadow: topDownShadow(colors.gridShadow, 10),
       ),
-      padding: const EdgeInsets.all(7),
       child: game.paused
           ? _PausedView(game: game, colors: colors)
           : Board(game: game),
@@ -293,114 +377,166 @@ class _PausedView extends StatelessWidget {
 class _ToolsRow extends StatelessWidget {
   final GameState game;
   final GameColors colors;
+  final VoidCallback onTogglePage;
 
-  const _ToolsRow({required this.game, required this.colors});
-
-  @override
-  Widget build(BuildContext context) {
-    final numberFirst = game.inputMode == InputMode.numberFirst;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: _ToolButton(
-              icon: Icons.undo,
-              label: 'Geri al',
-              colors: colors,
-              onTap: game.canUndo ? game.undo : null,
-            ),
-          ),
-          Expanded(
-            child: _ToolButton(
-              icon: Icons.backspace_outlined,
-              label: 'Silgi',
-              colors: colors,
-              onTap: game.isPlaying ? game.erase : null,
-            ),
-          ),
-          Expanded(
-            child: _ToolButton(
-              icon: Icons.lightbulb_outline,
-              label: 'İpucu',
-              colors: colors,
-              onTap: null,
-            ),
-          ),
-          if (!game.isKiller)
-            Expanded(
-              child: _ToolButton(
-                icon: Icons.edit_outlined,
-                label: game.notesMode ? 'Not: Açık' : 'Not: Kapalı',
-                active: game.notesMode,
-                colors: colors,
-                onTap: game.isPlaying ? game.toggleNotesMode : null,
-              ),
-            ),
-          Expanded(
-            child: _ToolButton(
-              icon: numberFirst ? Icons.dialpad : Icons.touch_app_outlined,
-              label: numberFirst ? 'Önce sayı' : 'Önce hücre',
-              colors: colors,
-              onTap: game.isPlaying ? game.toggleInputMode : null,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ToolButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-  final GameColors colors;
-  final VoidCallback? onTap;
-
-  const _ToolButton({
-    required this.icon,
-    required this.label,
+  const _ToolsRow({
+    required this.game,
     required this.colors,
-    this.active = false,
-    this.onTap,
+    required this.onTogglePage,
   });
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    final iconColor = active
-        ? colors.keyActiveText
-        : (enabled ? colors.icon : colors.muted.withValues(alpha: 0.5));
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
+    final numberFirst = game.inputMode == InputMode.numberFirst;
+    final playing = game.isPlaying;
+    return SizedBox(
+      height: 40,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: active ? colors.keyActive : Colors.transparent,
-              ),
-              child: Icon(icon, size: 22, color: iconColor),
+            _Tool(
+              tooltip: 'Geri al',
+              colors: colors,
+              onTap: game.canUndo ? game.undo : null,
+              child: const Icon(Icons.undo),
             ),
-            const SizedBox(height: 1),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                color: enabled ? colors.icon : colors.muted.withValues(alpha: 0.6),
+            _Tool(
+              tooltip: 'Silgi',
+              colors: colors,
+              onTap: playing ? game.erase : null,
+              child: const _EraserIcon(),
+            ),
+            _Tool(
+              tooltip: 'İpucu',
+              colors: colors,
+              onTap: null,
+              child: const Icon(Icons.lightbulb_outline),
+            ),
+            if (!game.isKiller)
+              _Tool(
+                tooltip: 'Not modu',
+                colors: colors,
+                active: game.notesMode,
+                onTap: playing ? game.toggleNotesMode : null,
+                child: const Icon(Icons.edit_outlined),
               ),
+            _Tool(
+              tooltip: numberFirst ? 'Önce sayı' : 'Önce hücre',
+              colors: colors,
+              onTap: playing ? game.toggleInputMode : null,
+              child: Icon(
+                  numberFirst ? Icons.dialpad : Icons.touch_app_outlined),
+            ),
+            const Spacer(),
+            _Tool(
+              tooltip: game.colorPage ? 'Rakamlar' : 'Renkler',
+              colors: colors,
+              active: game.colorPage,
+              onTap: onTogglePage,
+              child: const Icon(Icons.palette_outlined),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+/// Küçük, soluk, etiketsiz araç ikonu. Etkinken okra renkte.
+class _Tool extends StatelessWidget {
+  final String tooltip;
+  final GameColors colors;
+  final VoidCallback? onTap;
+  final bool active;
+  final Widget child;
+
+  const _Tool({
+    required this.tooltip,
+    required this.colors,
+    required this.onTap,
+    required this.child,
+    this.active = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    final color = active
+        ? brandOkra
+        : enabled
+            ? colors.tool
+            : colors.tool.withValues(alpha: 0.35);
+    return Tooltip(
+      message: tooltip,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 20,
+        child: SizedBox(
+          width: 44,
+          height: 40,
+          child: Center(
+            child: IconTheme(
+              data: IconThemeData(size: 20, color: color),
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Gerçek silgi şeklinde ikon: çapraz duran, iki parçalı silgi.
+class _EraserIcon extends StatelessWidget {
+  const _EraserIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = IconTheme.of(context);
+    final size = theme.size ?? 20;
+    return CustomPaint(
+      size: Size.square(size),
+      painter: _EraserPainter(theme.color ?? const Color(0xFF8C8C8C)),
+    );
+  }
+}
+
+class _EraserPainter extends CustomPainter {
+  final Color color;
+
+  _EraserPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width;
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = s * 0.085
+      ..strokeJoin = StrokeJoin.round;
+    canvas.save();
+    canvas.translate(s / 2, s * 0.46);
+    canvas.rotate(-math.pi / 4);
+    final body = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset.zero, width: s * 0.82, height: s * 0.4),
+      Radius.circular(s * 0.08),
+    );
+    canvas.drawRRect(body, stroke);
+    // Silginin uç kısmı (dolu)
+    final tip = Rect.fromLTRB(-s * 0.41, -s * 0.2, -s * 0.08, s * 0.2);
+    canvas.drawRRect(
+      RRect.fromRectAndCorners(tip,
+          topLeft: Radius.circular(s * 0.08),
+          bottomLeft: Radius.circular(s * 0.08)),
+      Paint()..color = color,
+    );
+    canvas.restore();
+    // Alt çizgi (silinen yüzey)
+    canvas.drawLine(Offset(s * 0.42, s * 0.9), Offset(s * 0.92, s * 0.9),
+        stroke..strokeCap = StrokeCap.round);
+  }
+
+  @override
+  bool shouldRepaint(covariant _EraserPainter old) => old.color != color;
 }

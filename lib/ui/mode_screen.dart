@@ -21,9 +21,9 @@ class ModeScreen extends StatelessWidget {
       return Container(
         height: 84,
         decoration: BoxDecoration(
-          color: colors.card,
+          color: colors.key,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: topDownShadow(colors.cardShadow, 14),
+          boxShadow: topDownShadow(colors.keyShadow, 14),
         ),
         child: Material(
           type: MaterialType.transparency,
@@ -129,9 +129,9 @@ class PuzzleListScreen extends StatelessWidget {
                 Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: colors.card,
+                    color: colors.key,
                     borderRadius: BorderRadius.circular(14),
-                    boxShadow: topDownShadow(colors.cardShadow, 10),
+                    boxShadow: topDownShadow(colors.keyShadow, 10),
                   ),
                   child: ListTile(
                     shape: RoundedRectangleBorder(

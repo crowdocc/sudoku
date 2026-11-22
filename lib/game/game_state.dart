@@ -57,8 +57,12 @@ class GameState extends ChangeNotifier {
   /// Seçimin kesin bilinen toplamı (en az iki hücre seçiliyse), yoksa null.
   int? selectionSum;
 
+  /// Kafes bazında elenmiş kombinasyonlar (kafes numarası → "139" gibi anahtarlar).
+  final Map<int, Set<String>> eliminatedCombos = <int, Set<String>>{};
+
   Timer? _timer;
   final List<_Snapshot> _undoStack = <_Snapshot>[];
+  final Set<int> _dragVisited = <int>{};
 
   GameState(this.puzzle, {this.inputMode = InputMode.cellFirst})
       : mode = puzzle.mode,
@@ -91,6 +95,48 @@ class GameState extends ChangeNotifier {
 
   bool get isKiller => mode == GameMode.killer;
 
+  /// Önce-sayı modunda ve Rakamlar sayfasındayken hücreler seçilmez.
+  bool get isNumberFirst =>
+      inputMode == InputMode.numberFirst && !colorPage;
+
+  /// Önce-sayı modunda seçili rakam not olarak mı girilecek.
+  bool get _activeAsNote => isKiller ? activeIsNote : notesMode;
+
+  /// Seçili tek hücrenin kafesi (killer), yoksa null.
+  int? get selectedCage {
+    if (!isKiller || selection.length != 1) return null;
+    final k = cageOf[selection.first];
+    return k < 0 ? null : k;
+  }
+
+  /// Bir kafese uyan bütün rakam kombinasyonları ("139" gibi).
+  List<String> combosForCage(int k) {
+    final cage = cages[k];
+    final out = <String>[];
+    void walk(int start, int left, int sum, String acc) {
+      if (left == 0) {
+        if (sum == cage.sum) out.add(acc);
+        return;
+      }
+      for (var d = start; d <= 9; d++) {
+        if (sum + d > cage.sum) break;
+        walk(d + 1, left - 1, sum + d, '$acc$d');
+      }
+    }
+
+    walk(1, cage.cells.length, 0, '');
+    return out;
+  }
+
+  bool isComboEliminated(int k, String combo) =>
+      eliminatedCombos[k]?.contains(combo) ?? false;
+
+  void toggleCombo(int k, String combo) {
+    final set = eliminatedCombos.putIfAbsent(k, () => <String>{});
+    if (!set.remove(combo)) set.add(combo);
+    notifyListeners();
+  }
+
   bool get isPlaying => status == GameStatus.playing && !paused;
 
   bool get canUndo => _undoStack.isNotEmpty && isPlaying;
@@ -120,9 +166,7 @@ class GameState extends ChangeNotifier {
 
   /// Vurgulanacak sayı: önce-sayı modunda seçili rakam, yoksa seçili hücredeki sayı.
   int? get highlightNumber {
-    if (inputMode == InputMode.numberFirst && activeNumber != null) {
-      return activeNumber;
-    }
+    if (isNumberFirst) return activeNumber;
     if (selection.length == 1) {
       final v = values[selection.first];
       if (v != 0) return v;
@@ -199,15 +243,24 @@ class GameState extends ChangeNotifier {
 
   void tapCell(int i) {
     if (!isPlaying) return;
-    final applying = !colorPage &&
-        inputMode == InputMode.numberFirst &&
-        activeNumber != null;
-    if (applying) {
-      selection
-        ..clear()
-        ..add(i);
-      _apply(activeNumber!, <int>{i}, isKiller ? activeIsNote : notesMode);
-    } else if (selection.length == 1 && selection.contains(i)) {
+    if (isNumberFirst) {
+      final d = activeNumber;
+      if (d == null) return;
+      if (_activeAsNote) {
+        if (values[i] != 0) return;
+        _pushUndo();
+        notes[i] ^= (1 << d);
+      } else if (!given[i] && values[i] == d) {
+        // Aynı rakamın olduğu kullanıcı hücresine tekrar dokunmak siler.
+        _pushUndo();
+        values[i] = 0;
+      } else {
+        _apply(d, <int>{i}, false);
+      }
+      _changed();
+      return;
+    }
+    if (selection.length == 1 && selection.contains(i)) {
       selection.clear();
     } else {
       selection
@@ -225,12 +278,16 @@ class GameState extends ChangeNotifier {
     _changed();
   }
 
-  bool get _dragEnabled =>
-      colorPage ||
-      !(inputMode == InputMode.numberFirst && activeNumber != null);
-
   void dragStart(int i) {
-    if (!isPlaying || !_dragEnabled) return;
+    if (!isPlaying) return;
+    if (isNumberFirst) {
+      _dragVisited.clear();
+      final d = activeNumber;
+      if (d == null || !_activeAsNote) return;
+      _pushUndo();
+      _dragNote(i, d);
+      return;
+    }
     selection
       ..clear()
       ..add(i);
@@ -238,8 +295,22 @@ class GameState extends ChangeNotifier {
   }
 
   void dragTo(int i) {
-    if (!isPlaying || !_dragEnabled) return;
+    if (!isPlaying) return;
+    if (isNumberFirst) {
+      final d = activeNumber;
+      if (d == null || !_activeAsNote) return;
+      _dragNote(i, d);
+      return;
+    }
     if (selection.add(i)) _changed();
+  }
+
+  /// Önce-sayı modunda kaydırma: gezilen boş hücrelere not ekler.
+  void _dragNote(int i, int d) {
+    if (!_dragVisited.add(i)) return;
+    if (values[i] != 0 || hasNote(i, d)) return;
+    notes[i] |= (1 << d);
+    _changed();
   }
 
   // ---------- Araçlar ----------
@@ -247,7 +318,8 @@ class GameState extends ChangeNotifier {
   void setColorPage(bool value) {
     if (colorPage == value) return;
     colorPage = value;
-    notifyListeners();
+    if (!value && inputMode == InputMode.numberFirst) selection.clear();
+    _changed();
   }
 
   void toggleNotesMode() {
@@ -262,6 +334,7 @@ class GameState extends ChangeNotifier {
         ? InputMode.numberFirst
         : InputMode.cellFirst;
     activeNumber = null;
+    selection.clear();
     _changed();
   }
 
@@ -269,7 +342,7 @@ class GameState extends ChangeNotifier {
   void pressNumber(int d, {bool asCandidate = false}) {
     if (!isPlaying) return;
     final asNote = isKiller ? asCandidate : notesMode;
-    if (inputMode == InputMode.numberFirst) {
+    if (isNumberFirst) {
       if (activeNumber == d && activeIsNote == asCandidate) {
         activeNumber = null;
       } else {
@@ -343,19 +416,20 @@ class GameState extends ChangeNotifier {
     _changed();
   }
 
+  /// Silgi: kullanıcı içeriğinin tamamını siler (sayı, notlar, boyama).
+  /// Bulmacanın verdiği sayılar silinmez.
   void erase() {
     if (!isPlaying) return;
     final targets = selection
-        .where((i) => !isLocked(i) && (values[i] != 0 || notes[i] != 0))
+        .where((i) =>
+            (!given[i] && values[i] != 0) || notes[i] != 0 || colors[i] != 0)
         .toList();
     if (targets.isEmpty) return;
     _pushUndo();
     for (final i in targets) {
-      if (values[i] != 0) {
-        values[i] = 0;
-      } else {
-        notes[i] = 0;
-      }
+      if (!given[i]) values[i] = 0;
+      notes[i] = 0;
+      colors[i] = 0;
     }
     _changed();
   }

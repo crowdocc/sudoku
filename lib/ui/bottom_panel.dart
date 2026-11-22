@@ -3,124 +3,37 @@ import 'package:flutter/material.dart';
 import '../game/game_state.dart';
 import 'app_theme.dart';
 
-/// Alt panel: "Rakamlar" ve "Renkler" sayfaları. Yukarı-aşağı kaydırılarak
-/// ya da üstteki ince sekmeye dokunarak geçilir.
-class BottomPanel extends StatefulWidget {
+/// Alt panel: "Rakamlar" ve "Renkler" sayfaları. Ayrı kart yok; tuşlar doğrudan
+/// zeminin üstünde. Yukarı-aşağı kaydırılarak ya da araç satırındaki geçiş
+/// ikonuyla sayfa değiştirilir.
+class BottomPanel extends StatelessWidget {
   final GameState game;
+  final PageController controller;
 
-  const BottomPanel({super.key, required this.game});
+  const BottomPanel({super.key, required this.game, required this.controller});
 
-  static double heightFor(GameState game) => game.isKiller ? 196 : 84;
-
-  @override
-  State<BottomPanel> createState() => _BottomPanelState();
-}
-
-class _BottomPanelState extends State<BottomPanel> {
-  final PageController _controller = PageController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _goTo(int page) {
-    _controller.animateToPage(page,
-        duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
-  }
+  static double heightFor(GameState game) => game.isKiller ? 190 : 70;
 
   @override
   Widget build(BuildContext context) {
-    final game = widget.game;
     final colors = GameColors.of(context);
-    final page = game.colorPage ? 1 : 0;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _Tabs(page: page, colors: colors, onSelect: _goTo),
-        Container(
-          height: BottomPanel.heightFor(game),
-          decoration: BoxDecoration(
-            color: colors.panel,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: topDownShadow(colors.cardShadow, 10),
-          ),
-          margin: const EdgeInsets.symmetric(horizontal: 10),
-          clipBehavior: Clip.antiAlias,
-          child: PageView(
-            controller: _controller,
-            scrollDirection: Axis.vertical,
-            onPageChanged: (p) => game.setColorPage(p == 1),
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: game.isKiller
-                    ? _KillerDigits(game: game, colors: colors)
-                    : _ClassicDigits(game: game, colors: colors),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: _ColorsPage(game: game, colors: colors),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Tabs extends StatelessWidget {
-  final int page;
-  final GameColors colors;
-  final ValueChanged<int> onSelect;
-
-  const _Tabs({required this.page, required this.colors, required this.onSelect});
-
-  @override
-  Widget build(BuildContext context) {
-    Widget tab(String label, int index) {
-      final active = page == index;
-      return InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => onSelect(index),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                  color: active ? colors.icon : colors.muted,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Container(
-                height: 2,
-                width: 26,
-                decoration: BoxDecoration(
-                  color: active ? brandOkra : Colors.transparent,
-                  borderRadius: BorderRadius.circular(1),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+    return SizedBox(
+      height: heightFor(game),
+      child: PageView(
+        controller: controller,
+        scrollDirection: Axis.vertical,
+        onPageChanged: (p) => game.setColorPage(p == 1),
         children: [
-          tab('Rakamlar', 0),
-          Text('|', style: TextStyle(fontSize: 12, color: colors.muted)),
-          tab('Renkler', 1),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+            child: game.isKiller
+                ? _KillerDigits(game: game, colors: colors)
+                : _ClassicDigits(game: game, colors: colors),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+            child: _ColorsPage(game: game, colors: colors),
+          ),
         ],
       ),
     );
@@ -322,9 +235,9 @@ class _KillerDigits extends StatelessWidget {
     Widget labeled(String label, Widget child) => Expanded(
           child: Column(
             children: [
-              Text(label, style: TextStyle(fontSize: 11, color: colors.muted)),
-              const SizedBox(height: 2),
               Expanded(child: child),
+              const SizedBox(height: 2),
+              Text(label, style: TextStyle(fontSize: 10, color: colors.muted)),
             ],
           ),
         );
