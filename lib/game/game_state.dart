@@ -109,6 +109,34 @@ class GameState extends ChangeNotifier {
     return k < 0 ? null : k;
   }
 
+  /// Seçilen hücrelerin hepsi tek bir kafese aitse o kafes (çipler için).
+  int? get chipsCage {
+    if (!isKiller || selection.isEmpty) return null;
+    final k = cageOf[selection.first];
+    if (k < 0) return null;
+    return selection.every((i) => cageOf[i] == k) ? k : null;
+  }
+
+  /// Gösterilen çiplerin sırası. Elenenler sona alınır, ama sadece kafes
+  /// yeniden gösterildiğinde (dokunurken çipler yer değiştirmesin diye).
+  List<String> comboOrder = const <String>[];
+  int? _shownCage;
+
+  void _updateComboOrder() {
+    final k = chipsCage;
+    if (k == _shownCage) return;
+    _shownCage = k;
+    if (k == null) {
+      comboOrder = const <String>[];
+      return;
+    }
+    final all = combosForCage(k);
+    comboOrder = [
+      ...all.where((c) => !isComboEliminated(k, c)),
+      ...all.where((c) => isComboEliminated(k, c)),
+    ];
+  }
+
   /// Bir kafese uyan bütün rakam kombinasyonları ("139" gibi).
   List<String> combosForCage(int k) {
     final cage = cages[k];
@@ -186,6 +214,7 @@ class GameState extends ChangeNotifier {
   /// Süre dışındaki her değişiklikten sonra çağrılır.
   void _changed() {
     _updateSum();
+    _updateComboOrder();
     notifyListeners();
   }
 

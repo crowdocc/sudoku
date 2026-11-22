@@ -224,7 +224,7 @@ class _ContextRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cage = game.selectedCage;
+    final cage = game.chipsCage;
     final sum = game.selectionSum;
     return SizedBox(
       height: 30,
@@ -266,7 +266,7 @@ class _ComboChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final combos = game.combosForCage(cage);
+    final combos = game.comboOrder;
     return ListView(
       scrollDirection: Axis.horizontal,
       children: [
@@ -293,25 +293,24 @@ class _ComboChips extends StatelessWidget {
     final off = game.isComboEliminated(cage, combo);
     return GestureDetector(
       onTap: () => game.toggleCombo(cage, combo),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        decoration: BoxDecoration(
-          color: off ? Colors.transparent : colors.key,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: colors.muted.withValues(alpha: off ? 0.25 : 0.4),
-            width: 0.8,
+      child: Opacity(
+        opacity: off ? 0.38 : 1,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          decoration: BoxDecoration(
+            color: colors.key,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: colors.keyBorder, width: 0.8),
           ),
-        ),
-        child: Text(
-          combo,
-          style: TextStyle(
-            fontSize: 12,
-            height: 1.1,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.5,
-            color: off ? colors.muted.withValues(alpha: 0.5) : colors.icon,
-            decoration: off ? TextDecoration.lineThrough : null,
+          child: Text(
+            combo,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.1,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+              color: colors.keyText,
+            ),
           ),
         ),
       ),
@@ -331,6 +330,7 @@ class _GridArea extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: colors.cell,
+        borderRadius: BorderRadius.circular(6),
         boxShadow: topDownShadow(colors.gridShadow, 10),
       ),
       child: game.paused

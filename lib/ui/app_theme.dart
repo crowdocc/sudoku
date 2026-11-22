@@ -35,15 +35,17 @@ List<BoxShadow> topDownShadow(Color color, double blur) => [
       BoxShadow(color: color, blurRadius: blur, offset: Offset.zero),
     ];
 
-/// Oyun ekranının renkleri. Hücre, seçim ve vurgular nötr tonlardadır.
+/// Oyun ekranının renkleri. Zemin okra tonlu; seçim ve vurgularda okra yok.
 class GameColors {
   final Color background;
   final Color gridShadow;
   final Color cell;
   final Color cellLine;
   final Color peer;
+  final Color sameNumber;
   final Color selected;
   final Color selectedBorder;
+  final Color selectedText;
   final Color boxLine;
   final Color givenText;
   final Color userText;
@@ -52,6 +54,7 @@ class GameColors {
   final Color cageLine;
   final Color cageText;
   final Color key;
+  final Color keyBorder;
   final Color keyShadow;
   final Color keyText;
   final Color engrave;
@@ -68,8 +71,10 @@ class GameColors {
     required this.cell,
     required this.cellLine,
     required this.peer,
+    required this.sameNumber,
     required this.selected,
     required this.selectedBorder,
+    required this.selectedText,
     required this.boxLine,
     required this.givenText,
     required this.userText,
@@ -78,6 +83,7 @@ class GameColors {
     required this.cageLine,
     required this.cageText,
     required this.key,
+    required this.keyBorder,
     required this.keyShadow,
     required this.keyText,
     required this.engrave,
@@ -90,56 +96,62 @@ class GameColors {
   });
 
   static const light = GameColors(
-    background: Color(0xFFEDEDEC),
-    gridShadow: Color(0x24000000),
-    cell: Color(0xFFFFFFFF),
-    cellLine: Color(0xFFE6E6E6),
-    peer: Color(0xFFEDEDED),
-    selected: Color(0xFFD3D3D3),
-    selectedBorder: Color(0xFF6A6A6A),
-    boxLine: Color(0x99B8963E),
+    background: Color(0xFFF3EFE6),
+    gridShadow: Color(0x1F000000),
+    cell: Color(0xFFFBF8F2),
+    cellLine: Color(0xFFE2DCCF),
+    peer: Color(0xFFEFE8DA),
+    sameNumber: Color(0xFFE2D8C3),
+    selected: Color(0xFFBCD0E8),
+    selectedBorder: Color(0xFF5F86B8),
+    selectedText: Color(0xFF1A1A1A),
+    boxLine: Color(0xFFB8963E),
     givenText: Color(0xFF1E1E1E),
     userText: Color(0xFF5C5C5C),
-    noteText: Color(0xFF6E6E6E),
+    noteText: Color(0xFF6A6A6A),
     error: Color(0xFFD32F2F),
-    cageLine: Color(0xFF505050),
-    cageText: Color(0xFF3A3A3A),
-    key: Color(0xFFF9F9F9),
-    keyShadow: Color(0x33000000),
+    cageLine: Color(0xFF4A4538),
+    cageText: Color(0xFF4A4538),
+    key: Color(0xFFFFFDF8),
+    keyBorder: Color(0xFFDDD6C7),
+    keyShadow: Color(0x29000000),
     keyText: Color(0xFF2A2A2A),
     engrave: Color(0xE6FFFFFF),
-    keyActive: Color(0xFF333333),
+    keyActive: Color(0xFF4A4538),
     keyActiveText: Color(0xFFFFFFFF),
     icon: Color(0xFF3A3A3A),
-    muted: Color(0xFF8A8A8A),
-    tool: Color(0xFF8C8C8C),
+    muted: Color(0xFF8A8578),
+    tool: Color(0xFF8C877B),
     paintAlpha: 0.55,
   );
 
   static const dark = GameColors(
-    background: Color(0xFF101010),
-    gridShadow: Color(0x99000000),
-    cell: Color(0xFF1B1B1B),
-    cellLine: Color(0xFF262626),
-    peer: Color(0xFF2A2A2A),
-    selected: Color(0xFF3D3D3D),
-    selectedBorder: Color(0xFFBDBDBD),
-    boxLine: Color(0x8CB8963E),
-    givenText: Color(0xFFA8A8A8),
+    background: Color(0xFF2A2824),
+    gridShadow: Color(0x59000000),
+    cell: Color(0xFF22201C),
+    cellLine: Color(0xFF383530),
+    peer: Color(0xFF3A362E),
+    sameNumber: Color(0xFF4B463B),
+    selected: Color(0xFF3E5F8A),
+    selectedBorder: Color(0xFF6A8DBA),
+    selectedText: Color(0xFFFFFFFF),
+    boxLine: Color(0xFFB8963E),
+    givenText: Color(0xFFB4B4B4),
     userText: Color(0xFFF5F5F5),
-    noteText: Color(0xFF9A9A9A),
+    noteText: Color(0xFFA3A3A3),
     error: Color(0xFFFF6B6B),
-    cageLine: Color(0xFFE4E4E4),
-    cageText: Color(0xFFE0E0E0),
-    key: Color(0xFF262626),
-    keyShadow: Color(0xB3000000),
-    keyText: Color(0xFFD8D8D8),
-    engrave: Color(0xB3000000),
-    keyActive: Color(0xFFE0E0E0),
-    keyActiveText: Color(0xFF121212),
-    icon: Color(0xFFD0D0D0),
-    muted: Color(0xFF8A8A8A),
-    tool: Color(0xFF8A8A8A),
+    cageLine: Color(0xFFEDE7DA),
+    cageText: Color(0xFFEDE7DA),
+    key: Color(0xFF35322C),
+    keyBorder: Color(0xFF1C1A17),
+    keyShadow: Color(0x73000000),
+    keyText: Color(0xFFE4E0D8),
+    engrave: Color(0x99000000),
+    keyActive: Color(0xFFD9D4C8),
+    keyActiveText: Color(0xFF22201C),
+    icon: Color(0xFFD6D1C6),
+    muted: Color(0xFF8F8A80),
+    tool: Color(0xFF9A958B),
     paintAlpha: 0.5,
   );
 

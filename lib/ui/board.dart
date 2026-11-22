@@ -81,28 +81,50 @@ class _BoardPainter extends CustomPainter {
     });
   }
 
-  Color _cellBackground(int i, int? primary, int? hlNum) {
+  /// Hücre dolgusu: seçili > aynı sayı > satır/sütun/kutu/kafes vurgusu > zemin.
+  Color? _cellFill(int i, int? primary, Set<int> peers, int? sameNum) {
     if (game.selection.contains(i)) return colors.selected;
-    if (primary != null && GameState.sameUnit(primary, i)) return colors.peer;
-    if (hlNum != null && game.values[i] == hlNum) return colors.peer;
-    return colors.cell;
+    if (sameNum != null && game.values[i] == sameNum) return colors.sameNumber;
+    if (peers.contains(i)) return colors.peer;
+    return null;
   }
 
   @override
   void paint(Canvas canvas, Size size) {
     final cell = size.width / 9;
     final sel = game.selection;
-    final primary = sel.length == 1 ? sel.first : null;
-    final hlNum = game.highlightNumber;
+    final numberFirst = game.isNumberFirst;
+    final primary = !numberFirst && sel.length == 1 ? sel.first : null;
+    final sameNum = game.highlightNumber;
     final killer = game.isKiller;
-    final fill = Paint();
 
-    // Hücre zeminleri, vurgular ve boyama (tek parça ızgara, hücre derinliği yok)
+    // Vurgulanan hücreler: tek seçimde satır, sütun, kutu ve (killer) kafes.
+    final peers = <int>{};
+    if (primary != null) {
+      for (var j = 0; j < 81; j++) {
+        if (GameState.sameUnit(primary, j)) peers.add(j);
+      }
+      final cage = game.cageOf[primary];
+      if (cage >= 0) peers.addAll(game.cages[cage].cells);
+    }
+
+    final frame = RRect.fromRectAndRadius(
+        Offset.zero & size, const Radius.circular(6));
+    canvas.save();
+    canvas.clipRRect(frame);
+
+    // 1) Zemin
+    canvas.drawRect(Offset.zero & size, Paint()..color = colors.cell);
+
+    // 2) Vurgu ve seçim dolguları, boyama
+    final fill = Paint();
     for (var i = 0; i < 81; i++) {
       final rect = _cellRect(i, cell);
-      fill.color = _cellBackground(i, primary, hlNum);
-      canvas.drawRect(rect, fill);
-
+      final f = _cellFill(i, primary, peers, sameNum);
+      if (f != null) {
+        fill.color = f;
+        canvas.drawRect(rect, fill);
+      }
       final mask = game.colors[i];
       if (mask == 0) continue;
       final list = <Color>[
@@ -123,21 +145,21 @@ class _BoardPainter extends CustomPainter {
         }
       }
       canvas.restore();
-      if (sel.contains(i)) {
-        canvas.drawRect(
-          rect.deflate(1.5),
-          Paint()
-            ..color = colors.selectedBorder
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5,
-        );
-      }
     }
 
-    // Hücre çizgileri: en ince ve en sönük; kutu sınırlarında çizilmez
+    // Seçili hücrelerin ince açık mavi kenarı
+    final selBorder = Paint()
+      ..color = colors.selectedBorder
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    for (final i in sel) {
+      canvas.drawRect(_cellRect(i, cell).deflate(1), selBorder);
+    }
+
+    // 3) Hücre çizgileri (~1 px, belli belirsiz); kutu sınırlarında çizilmez
     final thin = Paint()
       ..color = colors.cellLine
-      ..strokeWidth = 0.8;
+      ..strokeWidth = 1;
     for (var k = 1; k < 9; k++) {
       if (k % 3 == 0) continue;
       final p = k * cell;
@@ -145,39 +167,48 @@ class _BoardPainter extends CustomPainter {
       canvas.drawLine(Offset(0, p), Offset(size.width, p), thin);
     }
 
-    // 3x3 kutu çizgileri: ince, soluk okra
+    // 4) 3x3 kutu çizgileri (~2 px, düz okra)
     final box = Paint()
       ..color = colors.boxLine
-      ..strokeWidth = 1;
+      ..strokeWidth = 2;
     for (var k = 3; k < 9; k += 3) {
       final p = k * cell;
       canvas.drawLine(Offset(p, 0), Offset(p, size.height), box);
       canvas.drawLine(Offset(0, p), Offset(size.width, p), box);
     }
-    canvas.drawRect(
-      (Offset.zero & size).deflate(0.5),
+    canvas.restore();
+
+    // Dış çerçeve: ince, köşeleri hafif yuvarlak, hücre çizgisi renginde
+    canvas.drawRRect(
+      frame.deflate(0.5),
       Paint()
-        ..color = colors.boxLine
+        ..color = colors.cellLine
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1,
     );
 
+    // 5) Kafes çizgileri ve toplamlar
     if (killer) _paintCages(canvas, cell);
 
-    // Sayılar ve notlar
+    // 6) Sayılar ve notlar
     final bigSize = cell * (killer ? 0.52 : 0.58);
     final noteSize = cell * (killer ? 0.19 : 0.24);
     for (var i = 0; i < 81; i++) {
       final rect = _cellRect(i, cell);
+      final selected = sel.contains(i);
       final v = game.values[i];
       if (v != 0) {
         final TextPainter tp;
-        if (game.given[i]) {
-          tp = _text('g$v', '$v', bigSize, colors.givenText, FontWeight.w600);
-        } else if (game.isWrong(i)) {
+        if (game.isWrong(i)) {
           tp = _text('e$v', '$v', bigSize, colors.error, FontWeight.w400);
+        } else if (game.given[i]) {
+          tp = selected
+              ? _text('G$v', '$v', bigSize, colors.selectedText, FontWeight.w600)
+              : _text('g$v', '$v', bigSize, colors.givenText, FontWeight.w600);
         } else {
-          tp = _text('u$v', '$v', bigSize, colors.userText, FontWeight.w400);
+          tp = selected
+              ? _text('U$v', '$v', bigSize, colors.selectedText, FontWeight.w400)
+              : _text('u$v', '$v', bigSize, colors.userText, FontWeight.w400);
         }
         final dy = killer ? cell * 0.04 : 0.0;
         tp.paint(
@@ -191,10 +222,17 @@ class _BoardPainter extends CustomPainter {
         final sub = area.width / 3;
         for (var d = 1; d <= 9; d++) {
           if (!game.hasNote(i, d)) continue;
-          final strong = hlNum == d;
-          final tp = strong
-              ? _text('N$d', '$d', noteSize, colors.givenText, FontWeight.w700)
-              : _text('n$d', '$d', noteSize, colors.noteText, FontWeight.w500);
+          final TextPainter tp;
+          if (sameNum == d) {
+            tp = _text('N$d', '$d', noteSize,
+                selected ? colors.selectedText : colors.givenText,
+                FontWeight.w700);
+          } else if (selected) {
+            tp = _text('m$d', '$d', noteSize, colors.selectedText,
+                FontWeight.w500);
+          } else {
+            tp = _text('n$d', '$d', noteSize, colors.noteText, FontWeight.w500);
+          }
           final r = (d - 1) ~/ 3;
           final c = (d - 1) % 3;
           tp.paint(
@@ -210,16 +248,20 @@ class _BoardPainter extends CustomPainter {
   Rect _cellRect(int i, double cell) => Rect.fromLTWH(
       GameState.colOf(i) * cell, GameState.rowOf(i) * cell, cell, cell);
 
+  /// Kafes çizgileri: ince, kesikli, hücre kenarından ~4 px içeride, köşeleri
+  /// yuvarlak. Toplamın olduğu köşede çizgi sayının etrafından dolaşır.
   void _paintCages(Canvas canvas, double cell) {
-    final inset = cell * 0.13;
-    final dash = math.max(2.5, cell * 0.08);
-    final space = math.max(1.8, cell * 0.055);
+    final inset = math.min(4.0, cell * 0.11);
+    final r = math.min(3.0, inset * 0.8);
+    final dash = math.max(2.5, cell * 0.075);
+    final space = math.max(2.0, cell * 0.055);
     final line = Paint()
       ..color = colors.cageLine
-      ..strokeWidth = 1.2;
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
     final cageOf = game.cageOf;
 
-    // Kafes toplamları ve kapladıkları alan (kesik çizgi bu alanın dışında başlar)
+    // Toplamlar ve kapladıkları alan
     final sumSize = cell * 0.2;
     final labelEnd = <int, Offset>{};
     for (final cage in game.cages) {
@@ -227,64 +269,102 @@ class _BoardPainter extends CustomPainter {
       final rect = _cellRect(first, cell);
       final tp = _text('s${cage.sum}', '${cage.sum}', sumSize, colors.cageText,
           FontWeight.w600);
-      final pos = Offset(rect.left + cell * 0.05, rect.top + cell * 0.04);
+      final pos = Offset(rect.left + inset - 1, rect.top + 2);
       tp.paint(canvas, pos);
-      labelEnd[first] = Offset(pos.dx + tp.width + cell * 0.04,
-          pos.dy + tp.height + cell * 0.03);
+      labelEnd[first] =
+          Offset(pos.dx + tp.width + 2.5, pos.dy + tp.height + 2.5);
     }
 
-    bool same(int r, int c, int cage) =>
-        r >= 0 && r < 9 && c >= 0 && c < 9 && cageOf[r * 9 + c] == cage;
+    bool same(int row, int col, int cage) =>
+        row >= 0 &&
+        row < 9 &&
+        col >= 0 &&
+        col < 9 &&
+        cageOf[row * 9 + col] == cage;
 
-    // Kenar ucu: komşu farklı kafesteyse içeride biter, komşunun da aynı kenarı
-    // varsa hücre kenarına uzar, yoksa (iç köşe) karşı tarafa taşar.
+    // Kenar ucu: dış köşede yuvarlak için içeride biter, komşunun da aynı
+    // kenarı varsa hücre kenarına uzar, iç köşede karşı tarafa taşar.
     double extend(bool neighborSame, bool neighborHasEdge) {
-      if (!neighborSame) return inset;
+      if (!neighborSame) return inset + r;
       if (neighborHasEdge) return 0;
-      return -inset;
+      return -(inset - r);
+    }
+
+    void arc(Offset center, Offset from, Offset to) {
+      final a1 = math.atan2(from.dy, from.dx);
+      var sweep = math.atan2(to.dy, to.dx) - a1;
+      while (sweep > math.pi) {
+        sweep -= 2 * math.pi;
+      }
+      while (sweep < -math.pi) {
+        sweep += 2 * math.pi;
+      }
+      canvas.drawArc(Rect.fromCircle(center: center, radius: r), a1, sweep,
+          false, line);
     }
 
     for (var i = 0; i < 81; i++) {
       final cage = cageOf[i];
       if (cage < 0) continue;
-      final r = i ~/ 9;
-      final c = i % 9;
-      final left = c * cell;
-      final top = r * cell;
+      final row = i ~/ 9;
+      final col = i % 9;
+      final left = col * cell;
+      final top = row * cell;
       final right = left + cell;
       final bottom = top + cell;
       final label = labelEnd[i];
 
-      final upSame = same(r - 1, c, cage);
-      final downSame = same(r + 1, c, cage);
-      final leftSame = same(r, c - 1, cage);
-      final rightSame = same(r, c + 1, cage);
+      final upSame = same(row - 1, col, cage);
+      final downSame = same(row + 1, col, cage);
+      final leftSame = same(row, col - 1, cage);
+      final rightSame = same(row, col + 1, cage);
 
       if (!upSame) {
         final y = top + inset;
-        var x0 = left + extend(leftSame, !same(r - 1, c - 1, cage));
+        var x0 = left + extend(leftSame, !same(row - 1, col - 1, cage));
         if (label != null) x0 = math.max(x0, label.dx);
-        final x1 = right - extend(rightSame, !same(r - 1, c + 1, cage));
+        final x1 = right - extend(rightSame, !same(row - 1, col + 1, cage));
         _dashed(canvas, Offset(x0, y), Offset(x1, y), dash, space, line);
       }
       if (!downSame) {
         final y = bottom - inset;
-        final x0 = left + extend(leftSame, !same(r + 1, c - 1, cage));
-        final x1 = right - extend(rightSame, !same(r + 1, c + 1, cage));
+        final x0 = left + extend(leftSame, !same(row + 1, col - 1, cage));
+        final x1 = right - extend(rightSame, !same(row + 1, col + 1, cage));
         _dashed(canvas, Offset(x0, y), Offset(x1, y), dash, space, line);
       }
       if (!leftSame) {
         final x = left + inset;
-        var y0 = top + extend(upSame, !same(r - 1, c - 1, cage));
+        var y0 = top + extend(upSame, !same(row - 1, col - 1, cage));
         if (label != null) y0 = math.max(y0, label.dy);
-        final y1 = bottom - extend(downSame, !same(r + 1, c - 1, cage));
+        final y1 = bottom - extend(downSame, !same(row + 1, col - 1, cage));
         _dashed(canvas, Offset(x, y0), Offset(x, y1), dash, space, line);
       }
       if (!rightSame) {
         final x = right - inset;
-        final y0 = top + extend(upSame, !same(r - 1, c + 1, cage));
-        final y1 = bottom - extend(downSame, !same(r + 1, c + 1, cage));
+        final y0 = top + extend(upSame, !same(row - 1, col + 1, cage));
+        final y1 = bottom - extend(downSame, !same(row + 1, col + 1, cage));
         _dashed(canvas, Offset(x, y0), Offset(x, y1), dash, space, line);
+      }
+
+      // Köşeler: sx/sy köşenin yönü (-1 sol/üst, +1 sağ/alt)
+      for (final sx in const [-1, 1]) {
+        for (final sy in const [-1, 1]) {
+          final hSame = same(row, col + sx, cage);
+          final vSame = same(row + sy, col, cage);
+          final dSame = same(row + sy, col + sx, cage);
+          final q = Offset(sx < 0 ? left + inset : right - inset,
+              sy < 0 ? top + inset : bottom - inset);
+          if (!hSame && !vSame) {
+            // Dış köşe (toplamın olduğu köşe hariç)
+            if (label != null && sx < 0 && sy < 0) continue;
+            final center = q - Offset(sx * r, sy * r);
+            arc(center, Offset(sx.toDouble(), 0), Offset(0, sy.toDouble()));
+          } else if (hSame && vSame && !dSame) {
+            // İç köşe
+            final center = q + Offset(sx * r, sy * r);
+            arc(center, Offset(-sx.toDouble(), 0), Offset(0, -sy.toDouble()));
+          }
+        }
       }
     }
   }

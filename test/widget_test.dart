@@ -222,4 +222,25 @@ void main() {
     expect(g.isComboEliminated(cage, combos.first), isFalse);
     g.dispose();
   });
+
+  test('Çipler: tek kafes seçiminde görünür, elenen sonraki gösterimde sona gider', () {
+    final g = GameState(killerPuzzles[0]);
+    final k = g.cages.indexWhere((c) => c.cells.length >= 2 && g.combosForCage(g.cages.indexOf(c)).length >= 2);
+    final cells = g.cages[k].cells;
+    g.dragStart(cells[0]);
+    g.dragTo(cells[1]);
+    expect(g.chipsCage, k);
+    final first = g.comboOrder.first;
+    g.toggleCombo(k, first);
+    expect(g.comboOrder.first, first);
+    g.clearSelection();
+    expect(g.chipsCage, isNull);
+    g.tapCell(cells[0]);
+    expect(g.comboOrder.last, first);
+    final other = List.generate(81, (i) => i).firstWhere((i) => g.cageOf[i] != k);
+    g.dragStart(cells[0]);
+    g.dragTo(other);
+    expect(g.chipsCage, isNull);
+    g.dispose();
+  });
 }

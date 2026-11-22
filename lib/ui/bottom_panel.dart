@@ -67,6 +67,9 @@ class _Key extends StatelessWidget {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(10),
+          border: active || fillColor != null
+              ? null
+              : Border.all(color: colors.keyBorder, width: 0.8),
           boxShadow: faded ? null : topDownShadow(colors.keyShadow, 5),
         ),
         child: Material(
