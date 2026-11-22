@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ui/app_theme.dart';
-import 'ui/menu_screen.dart';
+import 'ui/mode_screen.dart';
 
 void main() {
   runApp(const SudokuApp());
@@ -18,7 +18,7 @@ class SudokuApp extends StatelessWidget {
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
       themeMode: ThemeMode.system,
-      home: const MenuScreen(),
+      home: const ModeScreen(),
     );
   }
 }

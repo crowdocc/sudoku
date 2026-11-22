@@ -6,12 +6,14 @@ import '../game/game_state.dart';
 import '../game/puzzles.dart';
 import 'app_theme.dart';
 import 'board.dart';
+import 'bottom_panel.dart';
 import 'end_screen.dart';
 
 class GameScreen extends StatefulWidget {
+  final GameMode mode;
   final int puzzleIndex;
 
-  const GameScreen({super.key, required this.puzzleIndex});
+  const GameScreen({super.key, required this.mode, required this.puzzleIndex});
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -27,7 +29,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    game = GameState(testPuzzles[widget.puzzleIndex],
+    game = GameState(puzzlesFor(widget.mode)[widget.puzzleIndex],
         inputMode: _lastInputMode);
     game.addListener(_onGameChanged);
     WidgetsBinding.instance.addObserver(this);
@@ -54,6 +56,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         MaterialPageRoute<void>(
           builder: (_) => EndScreen(
             won: won,
+            mode: widget.mode,
             puzzleIndex: widget.puzzleIndex,
             timeText: time,
             mistakes: mistakes,
@@ -84,25 +87,36 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               listenable: game,
               builder: (context, _) => Column(
                 children: [
-                  _TopBar(game: game, colors: colors),
                   Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Center(
-                        child: AspectRatio(
-                          aspectRatio: 1,
-                          child: game.paused
-                              ? _PausedView(game: game, colors: colors)
-                              : Board(game: game),
-                        ),
+                    // Izgara dışına (boş alana) dokununca seçim kalkar.
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: game.clearSelection,
+                      child: Column(
+                        children: [
+                          _TopBar(game: game, colors: colors),
+                          _InfoRow(game: game, colors: colors),
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(10, 4, 10, 8),
+                                child: AspectRatio(
+                                  aspectRatio: 1,
+                                  child: _GridCard(game: game, colors: colors),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
                   _ToolsRow(game: game, colors: colors),
-                  const SizedBox(height: 8),
-                  _NumberPad(game: game, colors: colors),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 4),
+                  BottomPanel(game: game),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
@@ -122,7 +136,7 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+      padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
       child: Row(
         children: [
           IconButton(
@@ -130,25 +144,7 @@ class _TopBar extends StatelessWidget {
             icon: Icon(Icons.arrow_back, color: colors.icon),
             onPressed: () => Navigator.of(context).maybePop(),
           ),
-          const SizedBox(width: 4),
-          Row(
-            children: List.generate(GameState.maxMistakes, (k) {
-              final used = k < game.mistakes;
-              return Container(
-                width: 11,
-                height: 11,
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: used ? colors.error : Colors.transparent,
-                  border: Border.all(
-                    color: used ? colors.error : colors.muted,
-                    width: 1.5,
-                  ),
-                ),
-              );
-            }),
-          ),
+          const SizedBox(width: 48),
           Expanded(
             child: Center(
               child: Text(
@@ -162,17 +158,100 @@ class _TopBar extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 52),
           IconButton(
             tooltip: game.paused ? 'Devam et' : 'Duraklat',
             icon: Icon(game.paused ? Icons.play_arrow : Icons.pause,
                 color: colors.icon),
-            onPressed: game.status == GameStatus.playing
-                ? game.togglePause
-                : null,
+            onPressed:
+                game.status == GameStatus.playing ? game.togglePause : null,
+          ),
+          IconButton(
+            tooltip: 'Ayarlar',
+            icon: Icon(Icons.settings_outlined, color: colors.icon),
+            onPressed: () {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(const SnackBar(
+                  content: Text('Ayarlar sonraki adımda gelecek.'),
+                  duration: Duration(seconds: 2),
+                ));
+            },
           ),
         ],
       ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final GameState game;
+  final GameColors colors;
+
+  const _InfoRow({required this.game, required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    final modeName = game.isKiller ? 'Killer' : 'Klasik';
+    final sum = game.selectionSum;
+    const style = TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      color: brandOkra,
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: SizedBox(
+        height: 24,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text('$modeName · #${game.puzzle.number}', style: style),
+            ),
+            if (sum != null) Text('Toplam: $sum', style: style),
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: List.generate(GameState.maxMistakes, (k) {
+                  final lost = k >= GameState.maxMistakes - game.mistakes;
+                  return Padding(
+                    padding: const EdgeInsets.only(left: 3),
+                    child: Icon(
+                      lost ? Icons.favorite_border : Icons.favorite,
+                      size: 18,
+                      color: lost
+                          ? colors.muted.withValues(alpha: 0.45)
+                          : brandOkra,
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Yuvarlak köşeli, hafifçe yükselmiş ızgara kartı.
+class _GridCard extends StatelessWidget {
+  final GameState game;
+  final GameColors colors;
+
+  const _GridCard({required this.game, required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.card,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: topDownShadow(colors.cardShadow, 16),
+      ),
+      padding: const EdgeInsets.all(7),
+      child: game.paused
+          ? _PausedView(game: game, colors: colors)
+          : Board(game: game),
     );
   }
 }
@@ -185,36 +264,28 @@ class _PausedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.peer,
-        border: Border.all(color: colors.thickLine, width: 2),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.pause_circle_outline, size: 56, color: colors.muted),
-          const SizedBox(height: 12),
-          Text(
-            'Duraklatıldı',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: colors.givenText,
-            ),
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.pause_circle_outline, size: 56, color: colors.muted),
+        const SizedBox(height: 12),
+        Text(
+          'Duraklatıldı',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: colors.givenText,
           ),
-          const SizedBox(height: 20),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: colors.padActive,
-              foregroundColor: colors.padActiveText,
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-            ),
-            onPressed: game.resume,
-            child: const Text('Devam et'),
+        ),
+        const SizedBox(height: 20),
+        FilledButton(
+          onPressed: game.resume,
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
           ),
-        ],
-      ),
+          child: const Text('Devam et'),
+        ),
+      ],
     );
   }
 }
@@ -250,15 +321,23 @@ class _ToolsRow extends StatelessWidget {
           ),
           Expanded(
             child: _ToolButton(
-              icon: Icons.edit_outlined,
-              label: game.notesMode ? 'Not: Açık' : 'Not: Kapalı',
-              active: game.notesMode,
+              icon: Icons.lightbulb_outline,
+              label: 'İpucu',
               colors: colors,
-              onTap: game.isPlaying ? game.toggleNotesMode : null,
+              onTap: null,
             ),
           ),
-          SizedBox(
-            width: 88,
+          if (!game.isKiller)
+            Expanded(
+              child: _ToolButton(
+                icon: Icons.edit_outlined,
+                label: game.notesMode ? 'Not: Açık' : 'Not: Kapalı',
+                active: game.notesMode,
+                colors: colors,
+                onTap: game.isPlaying ? game.toggleNotesMode : null,
+              ),
+            ),
+          Expanded(
             child: _ToolButton(
               icon: numberFirst ? Icons.dialpad : Icons.touch_app_outlined,
               label: numberFirst ? 'Önce sayı' : 'Önce hücre',
@@ -291,94 +370,36 @@ class _ToolButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final enabled = onTap != null;
     final iconColor = active
-        ? colors.padActiveText
+        ? colors.keyActiveText
         : (enabled ? colors.icon : colors.muted.withValues(alpha: 0.5));
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: 2),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: active ? colors.padActive : Colors.transparent,
+                color: active ? colors.keyActive : Colors.transparent,
               ),
-              child: Icon(icon, size: 24, color: iconColor),
+              child: Icon(icon, size: 22, color: iconColor),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 1),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
-                color: enabled ? colors.icon : colors.muted,
+                color: enabled ? colors.icon : colors.muted.withValues(alpha: 0.6),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _NumberPad extends StatelessWidget {
-  final GameState game;
-  final GameColors colors;
-
-  const _NumberPad({required this.game, required this.colors});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Row(
-        children: List.generate(9, (k) {
-          final d = k + 1;
-          final complete = game.isNumberComplete(d);
-          final active = game.inputMode == InputMode.numberFirst &&
-              game.activeNumber == d;
-          final Color textColor;
-          if (complete) {
-            textColor = colors.muted.withValues(alpha: 0.35);
-          } else if (active) {
-            textColor = colors.padActiveText;
-          } else {
-            textColor = colors.givenText;
-          }
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: Material(
-                color: active ? colors.padActive : colors.padButton,
-                borderRadius: BorderRadius.circular(10),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: complete || !game.isPlaying
-                      ? null
-                      : () => game.pressNumber(d),
-                  child: SizedBox(
-                    height: 58,
-                    child: Center(
-                      child: Text(
-                        '$d',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w500,
-                          color: textColor,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
       ),
     );
   }

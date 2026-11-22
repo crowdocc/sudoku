@@ -6,6 +6,7 @@ import 'game_screen.dart';
 
 class EndScreen extends StatelessWidget {
   final bool won;
+  final GameMode mode;
   final int puzzleIndex;
   final String timeText;
   final int mistakes;
@@ -13,6 +14,7 @@ class EndScreen extends StatelessWidget {
   const EndScreen({
     super.key,
     required this.won,
+    required this.mode,
     required this.puzzleIndex,
     required this.timeText,
     required this.mistakes,
@@ -20,7 +22,7 @@ class EndScreen extends StatelessWidget {
 
   void _openGame(BuildContext context, int index) {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => GameScreen(puzzleIndex: index)),
+      MaterialPageRoute<void>(builder: (_) => GameScreen(mode: mode, puzzleIndex: index)),
     );
   }
 
@@ -32,8 +34,9 @@ class EndScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurface.withValues(alpha: 0.65);
-    final next = (puzzleIndex + 1) % testPuzzles.length;
-    final number = testPuzzles[puzzleIndex].number;
+    final puzzles = puzzlesFor(mode);
+    final next = (puzzleIndex + 1) % puzzles.length;
+    final number = puzzles[puzzleIndex].number;
 
     final buttons = <Widget>[
       if (won) ...[
